@@ -4,7 +4,7 @@ import numpy as np
 import normalise_spectra as ns
 from scipy.interpolate import interp1d
 
-pathtodat = "/home/farmer/mathematica/DMFormFactor_13086288/EFTcoeffplotdata/"
+pathtodat = "EFTcoeffplotdata/"
 
 #labels = [["c{0}p".format(i),"c{0}n".format(i),"c{0}p=c{0}n".format(i)] for i in range(1,16)]
 operators = ["c{0}p=c{0}n".format(i) for i in range(1,16)]
@@ -171,6 +171,7 @@ for k,plot in enumerate(plotOs):
       plt.tight_layout()
 
       fig.savefig("{0}/N={1}_ops_group{2}.png".format(pathtodat,Nevents,k))
+      print "created {0}/N={1}_ops_group{2}.png".format(pathtodat,Nevents,k)
 
 # Nicer plots
 
@@ -212,7 +213,7 @@ for Onum,Oname,Olatexname in Ops:
    ax.legend(frameon=False, framealpha=0, prop={'size':10})
    plt.tight_layout()
    fig.savefig("{0}/N={1}_{2}.png".format(pathtodat,Nevents,Oname))
-
+   print "created {0}/N={1}_{2}.png".format(pathtodat,Nevents,Oname)
 #plt.show()
 
 #newtable += []

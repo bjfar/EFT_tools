@@ -3,34 +3,72 @@
 (* Compute recoil spectra for a specified isotope of Xenon *)
 
 (*Args:*)
-(*1 - Path to "v6/dmformfactor-V6.m"*)
-(*2 - Xenon isotope (e.g. "131")*)
-(*3 - flag to use relativistic operator coefficients*)
+(*1 - Absolute path to "v6/dmformfactor-V6.m"*)
+(*2 - Relative output path*)
+(*3 - Xenon isotope (e.g. "131")*)
+(*4 - flag to use relativistic operator coefficients*)
 
+(* Make output more readable in the terminal *)
+(* SetOptions["stdout", FormatType->InputForm] *)
 
 args = Join[$CommandLine[[4;;]],Table[{},{i,1,10}]];
-Print["Running with command line arguments: "<>ToString[args]]
-path = args[[1]]
-Print["Setting working directory to: "<>path]
-isotope = ToExpression[args[[2]]]
-userel = (args[[3]] == "R") (* Switch to using coefficients of relativistic operators (spin 1/2 WIMP only) *)
-checkrel = (args[[4]] == "check") (* Compute coefficients of relativistic operators using their non-relativistic reductions (to check that I understand the mapping correctly *)
+(* Print["Running with command line arguments: "<>ToString[args]]; *)
+outpath = Directory[]<>"/"<>args[[2]];
+Print["Setting output directory to: "<>outpath];
+If[!DirectoryQ[outpath],
+  Print["\nOutput directory "<>outpath<>" does not exist! Please create it and try again.\n"];
+  Exit[1];
+];
+
+path = args[[1]];
+Print["Looking for DMFormFactor in directory: "<>path]
+If[!DirectoryQ[path],
+  Print["\nSupplied DMFormFactor directory "<>path<>" does not exist! Please check it for typos and try again\n"];
+  Exit[1];
+];
+SetDirectory[path];
+(* SetDirectory["/home/farmer/mathematica/DMFormFactor_13086288"] (* for testing in notebook *)*)
+Check[
+  <<"v6/dmformfactor-V6.m";
+ ,
+  Print["...Error loading DMFormFactor package. Please check the path (and perhaps version; this script requires v6) and try again"];
+  Exit[1];
+]
+Print["...Found."];
+isotope = ToExpression[args[[3]]];
+Otype = args[[4]]
+userel = SameQ[Otype,"R"]; (* Switch to using coefficients of relativistic operators (spin 1/2 WIMP only) *)
+checkrel = SameQ[args[[5]],"check"]; (* Compute coefficients of relativistic operators using their non-relativistic reductions (to check that I understand the mapping correctly *)
 
 (* Check that chosen Xenon isotope is valid *)
-validiso = {128,129,130,131,132,134,136}
-If[Count[validiso,isotope]==0, Print["Requested Xenon isotope '"<>ToString[isotope]<>"' is invalid! Aborting..."]; Exit[];];
-
-SetDirectory[path]
-(* SetDirectory["/home/farmer/mathematica/DMFormFactor_13086288"] (* for testing in notebook *)*)
-<<"v6/dmformfactor-V6.m";
+validiso = {128,129,130,131,132,134,136};
+If[Count[validiso,isotope]==0, 
+  Print["\nRequested Xenon isotope '"<>ToString[isotope]<>"' is invalid! Aborting...\n"]; 
+  Exit[1];
+];
 
 (* Helper functions *)
-SetAttributes[DoSilent, HoldAll]
+SetAttributes[DoSilent, HoldAll];
 DoSilent[expr_] := Block[{Print = Null &}, expr];
 
 (* WIMP masses for which we want recoil spectra *)
-(*m\[Chi]={5,6,10,30,50,100,300,500,700,800,1000,2000,3000,5000}; (* GeV *) *)
-m\[Chi]={5,50,500,5000}; (* GeV *)
+m\[Chi]={3,5,6,7,8,9,10,15,20,30,50,100,300,500,700,800,1000,2000,3000,5000}; (* GeV *)
+(*m\[Chi]={5,50,500,5000}; (* GeV *) *)
+spin=1/2 (*leave hardcoded for now*)
+
+(* Exposure to use for rate calculations. Can be easily scaled to something different in later analysis steps. *) 
+benchmarkExposure = 7800 KilogramDay;
+
+(* Turn on handler to abort evaluation if anything weird happens *)
+messageHandler = If[Last[#], Print["An error has occurred in 'recoil_generator.m'; aborting evaluation..."] Exit[1];]&
+Internal`AddHandler["Message", messageHandler]
+
+Print["**************************************"    ]
+Print[" Generating recoil spectra for Xe"<>ToString[isotope]<>"..."]
+Print[" ...for spin "<>ToString[spin]<>" WIMP"    ]
+Print[" ...for masses (GeV) "<>ToString[m\[Chi]]  ]
+Print[" ...for operator type "<>Otype             ]
+Print["**************************************"    ]
 
 (* Model Setup *)
 SetJChi[1/2](* WIMP spin *)
@@ -161,7 +199,7 @@ ERmaxesc = Table[2(((\[Mu]T[[i]]^2) (v^2) )/mT)/GeV/.v->vesc,{i,1,Length[m\[Chi]
 
 (* General function to compute recoil spectra (couplings not yet replaced with values) *)
 ruleQtoE = {qGeV->Sqrt[2*mTv*ER], mTv->mT/GeV}
-generalfunc= 7800 KilogramDay*dRdE GeV /. ruleQtoE;
+generalfunc= benchmarkExposure*dRdE GeV /. ruleQtoE;
 
 curvenames=Table["m\[Chi]="<>ToString[m\[Chi][[i]]],{i,1,Length[m\[Chi]]}];
 
@@ -233,33 +271,68 @@ If[userel && checkrel,
   rules=Table[{{coefflist[[2*i-1]]->1},{coefflist[[2*i]]->1},{coefflist[[2*i-1]]->1,coefflist[[2*i]]->1}},{i,1,Nops}];
 ]
 
-funcsinter=Table[Table[ Print["  WIMP mass= "<>ToString[m\[Chi][[m]]]<>", Operator="<>ToString[i]]; Table[
-  temp=(generalfunc//.rules[[i]][[p]]/.resttozero/.MWIMP->m\[Chi][[m]]/.ruleQtoE);
-  (* Simplify the result if all the GeV's haven't already cancelled out *)
-  If[ FreeQ[temp, GeV],
-     temp,
-     Simplify[temp]
-   ]
-  ,{p,1,3}],{m,1,Length[m\[Chi]]}],{i,1,Nops}];
+funcsinter=Table[Table[ 
+  WriteString["stdout", "  Evaluating WIMP mass= "<>ToString[m\[Chi][[m]]]<>", Operator="<>ToString[i]<>"          ",  "\r"];
+  Table[
+    temp=(generalfunc//.rules[[i]][[p]]/.resttozero/.MWIMP->m\[Chi][[m]]/.ruleQtoE);
+    (* Simplify the result if all the GeV's haven't already cancelled out *)
+    If[ FreeQ[temp, GeV],
+      temp,
+      Simplify[temp]
+    ]
+  ,{p,1,3}]
+,{m,1,Length[m\[Chi]]}],{i,1,Nops}];
+Print["  Complete!                                "];
 
 (* plot titles *)
 titles=Table[{ToString[coefflist[[2*i-1]]],ToString[coefflist[[2*i]]],ToString[coefflist[[2*i-1]]]<>"="<>ToString[coefflist[[2*i]]]},{i,1,Nops}];
 
 (* Convert expressions to functions so that recoil energies can be supplied as arguments*)
 Print["Converting expressions to functions..."]
-funcs=Table[Table[Print["  WIMP mass= "<>ToString[m\[Chi][[m]]]<>", Operator="<>ToString[i]]; Table[With[{i=i,p=p,m=m},(funcsinter[[i]][[m]][[p]]/.ER->#)&],{p,1,3}],{m,1,Length[m\[Chi]]}],{i,1,Nops}];
+funcs=Table[Table[
+  WriteString["stdout", "  Evaluating WIMP mass= "<>ToString[m\[Chi][[m]]]<>", Operator="<>ToString[i]<>"          ", "\r"];
+  Table[
+    With[{i=i,p=p,m=m},(funcsinter[[i]][[m]][[p]]/.ER->#)&]
+  ,{p,1,3}]
+,{m,1,Length[m\[Chi]]}],{i,1,Nops}];
+Print["  Complete!                                "];
 
 (* Specifiy recoil energies at which to evaluate the function *)
 Earr=Table[N[ER*10^-6],{ER,0 ,1000,1}];
 
 (* Apply the analytic expressions to the chosen recoil energies and obtain final numerical tables *)
-Print["Computing numerical results at "<>ToString[Length[Earr]]<>" recoil energies between "<>ToString[FortranForm[First[Earr]]]<>" and "<>ToString[FortranForm[Last[Earr]]]<>" keV"];
-plotdata=Table[Print["  Operator="<>ToString[i]]; Table[Transpose[Join[{Earr*10^6},Table[10^-6*funcs[[i]][[m]][[p]]/@Earr,{m,1,Length[m\[Chi]]}]]],{p,1,3}],{i,1,Nops}];
+Print["Computing numerical results at "<>ToString[Length[Earr]]<>" recoil energies between "<>ToString[FortranForm[First[Earr]]]<>" and "<>ToString[FortranForm[Last[Earr]]]<>" GeV"];
+plotdata=
+ Table[
+   WriteString["stdout", "  Evaluating operator="<>ToString[i]<>"          ", "\r"];
+   Table[
+      Transpose[Join[{Earr*10^6},
+                  Table[
+                        10^-6*funcs[[i]][[m]][[p]]/@Earr
+                       ,{m,1,Length[m\[Chi]]}
+                       ]
+                    ]
+               ]
+   ,{p,1,3}]
+ ,{i,1,Nops}];
+Print["  Complete!                                "];
 
 (* Save data tables to file *)
-Do[Do[Export["/home/farmer/mathematica/DMFormFactor_13086288/EFTcoeffplotdata/Xe"<>ToString[IsotopeA]<>"/Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>titles[[i]][[p]]<>".dat",plotdata[[i]][[p]],"Table"],{i,1,Nops}],{p,1,3}];
-
+extendedoutpath=outpath<>"/Xe"<>ToString[IsotopeA]
+If[!DirectoryQ[extendedoutpath], CreateDirectory[extendedoutpath]]
+Do[
+  Do[
+    filename="Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>titles[[i]][[p]]<>".dat";
+    Export[extendedoutpath<>"/"<>filename, plotdata[[i]][[p]], "Table"]
+  ,{i,1,Nops}]
+,{p,1,3}];
 
 (* Report on which operators vanish for this isotope *)
-Do[Do[Print[{"Vanishes? ",0==dRdE GeV//.rules[[i]][[p]]/.resttozero/.MWIMP->500/.ruleQtoE/.ER->53.14*10^-6//Simplify}],{p,1,3}],{i,1,Nops}]
+Do[
+  Do[
+    Print[{"Vanishes? ",0==dRdE GeV//.rules[[i]][[p]]/.resttozero/.MWIMP->500/.ruleQtoE/.ER->53.14*10^-6//Simplify}]
+  ,{p,1,3}]
+,{i,1,Nops}]
 
+(* Exit with success exit code *)
+Exit[0];

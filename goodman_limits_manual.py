@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 #from scipy.interpolate import interp1d
 from scipy import interp
 
-import limit_comparison.translate_couplings as t
-import limit_comparison.comparison_tools as tools
-import limit_comparison.parameters as p
+import old.limit_comparison.translate_couplings as t
+import old.limit_comparison.comparison_tools as tools
+import old.limit_comparison.parameters as p
 
-rootpath = "/home/farmer/mathematica/DMFormFactor_13086288/"
+output_list = "\nFiles created:\n"
 
 #=====================================
 
@@ -46,9 +46,9 @@ g9G = g7G
 
 #================================
 # Goodman limit curves
-M1_mchi, M1_limit = np.loadtxt("goodman_limits/M1+3_tevatron.csv",delimiter=",").T
-M6_mchi, M6_limit = np.loadtxt("goodman_limits/M5+6_tevatron.csv",delimiter=",").T
-M7_mchi, M7_limit = np.loadtxt("goodman_limits/M7+9_tevatron.csv",delimiter=",").T
+M1_mchi, M1_limit = np.loadtxt("goodman_limits_data/M1+3_tevatron.csv",delimiter=",").T
+M6_mchi, M6_limit = np.loadtxt("goodman_limits_data/M5+6_tevatron.csv",delimiter=",").T
+M7_mchi, M7_limit = np.loadtxt("goodman_limits_data/M7+9_tevatron.csv",delimiter=",").T
 
 # Do some (constant) extrapolation on the low end, and interpolation in the middle.
 smooth_M1_mchi = np.logspace(0,np.log10(np.max(M1_mchi)),num=50)
@@ -73,7 +73,9 @@ ax.set_xlabel("$m_\chi$")
 ax.set_ylabel(r"$M_{*}$")
 plt.legend(frameon=False)
 plt.tight_layout()
-fig.savefig("MstarM1M6M7_lims.png")
+fname="MstarM1M6M7_lims.png"
+fig.savefig(fname)
+output_list += fname+"\n"
 
 # If it looks ok, replace original data with interpolated/extrapolated data
 M1_mchi  = smooth_M1_mchi 
@@ -158,7 +160,7 @@ sigmaSD_M6q_v2 = 9.18e-40 * t.Mred(M6_mchi,p.mN)**2 * (300./M6_limit)**4
 # For proton:  Delp_u =  0.77, Delp_d = -0.4,  Delp_s = -0.12
 # For neutron: Deln_u = -0.4,  Deln_d =  0.77, Delp_s = -0.12
 # Pretty weird arrangement needed to cancel
-# But, Xenon100 is much more sensitive to the neutron coupling anyway,
+# But, XENON100 is much more sensitive to the neutron coupling anyway,
 # so perhaps just compare the "equal coupling to all quarks" model against
 # the constraints on neutron coupling.
 
@@ -191,21 +193,23 @@ g10n_M9G = t.calc_cN_pseudoscalar(0,0,0,0,0,0,g9G_limit,p.data_n)
 
 #=========================================
 
-# Get SI Xenon100 225 live day limits (1207.5988)
-mX225, sigmaSI_X225 = np.loadtxt(rootpath+"/goodman_limits/xenon225livedays.csv",delimiter=",").T
+# Get SI XENON100 225 live day limits (1207.5988)
+mX225, sigmaSI_X225 = np.loadtxt("goodman_limits_data/xenon225livedays.csv",delimiter=",").T
 sigmaSI_X225 = 10**sigmaSI_X225 # data in file is in log10 units
 
-# Compare to SI Xenon100 estimated limits via EFT:
-c1_lim_Xenon100 = tools.get_c_curve("c1p=c1n") # SI operator, equal proton/neutron couplings
-c1n_lim_Xenon100 = tools.get_c_curve("c1n") # SI operator, neutron only couplings
+# Compare to SI XENON100 estimated limits via EFT:
+c1_lim_XENON100 = tools.get_c_curve("c1p=c1n") # SI operator, equal proton/neutron couplings
+c1n_lim_XENON100 = tools.get_c_curve("c1n") # SI operator, neutron only couplings
+c1p_lim_XENON100 = tools.get_c_curve("c1p") # SI operator, neutron only couplings
 
 # Convert to/from sigma_SD (in cm^-2)
 
 # WIMP-nucleon couplings squared
 g1nsq_M1q    = g1n_M1q**2
 g1nsq_M7G    = g1n_M7G**2
-g1sq_limEFT  = np.array(c1_lim_Xenon100)**2  * p.mWeak**-4
-g1nsq_limEFT = np.array(c1n_lim_Xenon100)**2 * p.mWeak**-4
+g1sq_limEFT  = np.array(c1_lim_XENON100)**2  * p.mWeak**-4
+g1nsq_limEFT = np.array(c1n_lim_XENON100)**2 * p.mWeak**-4
+g1psq_limEFT = np.array(c1p_lim_XENON100)**2 * p.mWeak**-4
 g1sq_X225    = sigmaSI_X225 / t.gsq_to_sigma(mX225,1)
 
 # cross sections
@@ -213,6 +217,7 @@ sigmaSI_M1q     = g1nsq_M1q    * t.gsq_to_sigma(M1_mchi,1)
 sigmaSI_M7G     = g1nsq_M7G    * t.gsq_to_sigma(M7_mchi,1)
 sigmaSI_limEFT  = g1sq_limEFT  * t.gsq_to_sigma(tools.masses,1)
 sigmaSIn_limEFT = g1nsq_limEFT * t.gsq_to_sigma(tools.masses,1)
+sigmaSIp_limEFT = g1psq_limEFT * t.gsq_to_sigma(tools.masses,1)
 #sigmaSI_X225   #nothing to do
 
 N = 3
@@ -222,9 +227,10 @@ ax.plot(M1_mchi, sigmaSI_M1q,    label="$\overline{\chi}\chi\overline{q}q$ (Teva
 ax.plot(M7_mchi, sigmaSI_M7G,    label="$\overline{\chi}\chi G G$ (Tevatron)", lw=2) 
 ax.plot(M1_mchi, sigmaSI_M1q_v2, label="$\overline{\chi}\chi\overline{q}q$ (Tevatron) v.2", lw=2, c='purple') 
 ax.plot(M7_mchi, sigmaSI_M7G_v2, label="$\overline{\chi}\chi G G$ (Tevatron) v.2", lw=2, c='m') 
-ax.plot(tools.masses,  sigmaSI_limEFT, label="Xenon100 N=5 EFT (c1p=c1n)", c='r', lw=2)
-ax.plot(tools.masses,  sigmaSIn_limEFT, label="Xenon100 N=5 EFT (c1n)", c='orange', lw=2)
-ax.plot(mX225,   sigmaSI_X225,   label="Xenon100 225 live days", c='k', lw=2)
+ax.plot(tools.masses,  sigmaSI_limEFT, label="XENON100 est. 90% CL (c1p=c1n)", c='r', lw=2)
+ax.plot(tools.masses,  sigmaSIn_limEFT, label="XENON100 est. 90% CL (c1n)", c='gray', lw=2)
+ax.plot(tools.masses,  sigmaSIp_limEFT, label="XENON100 est. 90% CL (c1p)", c='orange', lw=2)
+ax.plot(mX225,   sigmaSI_X225,   label="XENON100 225 live days", c='k', lw=2)
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlabel("$m_\chi$")
@@ -238,9 +244,10 @@ ax = fig.add_subplot(N,2,2)
 # Note, plotting coupling to neutrons, but proton coupling is very similar unless quark/gluon-level couplings highly tuned
 ax.plot(M1_mchi, g1nsq_M1q   * p.mWeak**4, label="$\overline{\chi}\chi\overline{q}q$ (Tevatron)", lw=2)
 ax.plot(M1_mchi, g1nsq_M7G   * p.mWeak**4, label="$\overline{\chi}\chi G G$ (Tevatron)", lw=2)
-ax.plot(tools.masses,  g1sq_limEFT * p.mWeak**4, label="Xenon100 N=5 EFT (c1p=c1n)", c='r', lw=2)
-ax.plot(tools.masses,  g1nsq_limEFT* p.mWeak**4, label="Xenon100 N=5 EFT (c1n)", c='orange', lw=2)
-ax.plot(mX225,   g1sq_X225   * p.mWeak**4, label="Xenon100 225 live days", c='k', lw=2)
+ax.plot(tools.masses,  g1sq_limEFT * p.mWeak**4, label="XENON100 est. 90% CL (c1p=c1n)", c='r', lw=2)
+ax.plot(tools.masses,  g1nsq_limEFT* p.mWeak**4, label="XENON100 est. 90% CL (c1n)", c='gray', lw=2)
+ax.plot(tools.masses,  g1psq_limEFT* p.mWeak**4, label="XENON100 est. 90% CL (c1p)", c='orange', lw=2)
+ax.plot(mX225,   g1sq_X225   * p.mWeak**4, label="XENON100 225 live days", c='k', lw=2)
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlabel("$m_\chi$")
@@ -255,37 +262,40 @@ fig2 = plt.figure(figsize=(6,4))
 ax = fig2.add_subplot(111)
 ax.plot(M1_mchi, g1nsq_M1q   * p.mWeak**4, label="$\overline{\chi}\chi\overline{q}q$ (Tevatron)", lw=2)
 ax.plot(M1_mchi, g1nsq_M7G   * p.mWeak**4, label="$\overline{\chi}\chi G G$ (Tevatron)", lw=2)
-ax.plot(tools.masses,  g1sq_limEFT * p.mWeak**4, label="Xenon100 N=5 EFT (c1p=c1n)", c='r', lw=2)
-ax.plot(tools.masses,  g1nsq_limEFT* p.mWeak**4, label="Xenon100 N=5 EFT (c1n)", c='orange', lw=2)
-#ax.plot(mX225,   g1sq_X225   * p.mWeak**4, label="Xenon100 225 live days", c='k', lw=2)
+ax.plot(tools.masses,  g1sq_limEFT * p.mWeak**4, label="XENON100 est. 90% CL (c1p=c1n)", c='r', lw=2)
+ax.plot(tools.masses,  g1nsq_limEFT* p.mWeak**4, label="XENON100 est. 90% CL (c1n)", c='gray', lw=2)
+ax.plot(tools.masses,  g1psq_limEFT* p.mWeak**4, label="XENON100 est. 90% CL (c1p)", c='orange', lw=2)
+#ax.plot(mX225,   g1sq_X225   * p.mWeak**4, label="XENON100 225 live days", c='k', lw=2)
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlabel("$m_\chi$")
 ax.set_ylabel(r"$c_1^2 \times\, m^4_\mathrm{weak}$")
 plt.legend(frameon=False)
 plt.tight_layout()
-fig2.savefig("note_M1M7_lims.png")
+fname = "note_M1M7_lims.png"
+fig2.savefig(fname)
+output_list += fname+"\n"
 #-------
 
 #-- Now the SD plots ---
 
-# Get SD Xenon100 225 live day limits (1301.6620)
-mX225_SDn, sigmaSDn_X225 = np.loadtxt(rootpath+"/goodman_limits/xenon225livedays_SDn.csv",delimiter=",").T
-#mX225_SDp, sigmaSDp_X225 = np.loadtxt(rootpath+"/goodman_limits/xenon225livedays_SDp.csv",delimiter=",").T
+# Get SD XENON100 225 live day limits (1301.6620)
+mX225_SDn, sigmaSDn_X225 = np.loadtxt("goodman_limits_data/xenon225livedays_SDn.csv",delimiter=",").T
+mX225_SDp, sigmaSDp_X225 = np.loadtxt("goodman_limits_data/xenon225livedays_SDp.csv",delimiter=",").T
 sigmaSDn_X225 = 10**sigmaSDn_X225 # data in file is in log10 units
 #sigmaSDp_X225 = 10**sigmaSDn_X225 # data in file is in log10 units
 
-# SD Xenon100 estimated limits via EFT:
-c4_lim_Xenon100 = tools.get_c_curve("c4p=c4n") # SD operator, equal proton/neutron couplings
-#c4p_lim_Xenon100 = tools.get_c_curve("c4p")    # SD operator, coupling only to proton
-c4n_lim_Xenon100 = tools.get_c_curve("c4n")    # SD operator, coupling only to neutron; Will be basically same as c4p=c4n case due to small sensitivity of Xenon100 to c4p.
+# SD XENON100 estimated limits via EFT:
+c4_lim_XENON100 = tools.get_c_curve("c4p=c4n") # SD operator, equal proton/neutron couplings
+#c4p_lim_XENON100 = tools.get_c_curve("c4p")    # SD operator, coupling only to proton
+c4n_lim_XENON100 = tools.get_c_curve("c4n")    # SD operator, coupling only to neutron; Will be basically same as c4p=c4n case due to small sensitivity of XENON100 to c4p.
 
 # Convert to/from sigma_SD (in cm^-2)
 
 # WIMP-nucleon couplings squared
 g4nsq_M6q    = g4n_M6q**2
-g4sq_limEFT  = np.array(c4_lim_Xenon100)**2  * p.mWeak**-4
-g4nsq_limEFT = np.array(c4n_lim_Xenon100)**2 * p.mWeak**-4
+g4sq_limEFT  = np.array(c4_lim_XENON100)**2  * p.mWeak**-4
+g4nsq_limEFT = np.array(c4n_lim_XENON100)**2 * p.mWeak**-4
 g4nsq_X225   = sigmaSDn_X225 / t.gsq_to_sigma(mX225_SDn,4)
 
 # cross sections
@@ -298,9 +308,9 @@ sigmaSDn_limEFT = g4nsq_limEFT * t.gsq_to_sigma(tools.masses,4)
 ax = fig.add_subplot(N,2,3)
 ax.plot(M6_mchi, sigmaSDn_M6q,   label="$\overline{\chi}\gamma_5\gamma_\mu\chi\overline{q}\gamma_5\gamma^\mu q$ (Tevatron)", lw=2, c='purple') 
 ax.plot(M6_mchi, sigmaSD_M6q_v2, label="$\overline{\chi}\gamma_5\gamma_\mu\chi\overline{q}\gamma_5\gamma^\mu q$ (Tevatron) v.2", lw=2, c='magenta') 
-ax.plot(tools.masses,  sigmaSD_limEFT,  label="Xenon100 N=5 EFT (c4n=c4p)", c='r', lw=2)
-ax.plot(tools.masses,  sigmaSDn_limEFT, label="Xenon100 N=5 EFT (c4n)", c='orange', lw=2)
-ax.plot(mX225_SDn, sigmaSDn_X225, label="Xenon100 225 live days (n)", c='k', lw=2)
+ax.plot(tools.masses,  sigmaSD_limEFT,  label="XENON100 est. 90% CL (c4n=c4p)", c='r', lw=2)
+ax.plot(tools.masses,  sigmaSDn_limEFT, label="XENON100 est. 90% CL (c4n)", c='orange', lw=2)
+ax.plot(mX225_SDn, sigmaSDn_X225, label="XENON100 225 live days (n)", c='k', lw=2)
 
 ax.set_xscale("log")
 ax.set_yscale("log")
@@ -313,9 +323,9 @@ plt.legend(frameon=False)
 ylims = ax.get_ylim() # Get y limits from cross-section plot
 ax = fig.add_subplot(N,2,4)
 ax.plot(M6_mchi, g4nsq_M6q    * p.mWeak**4, label="$\overline{\chi}\gamma_5\gamma_\mu\chi\overline{q}\gamma_5\gamma^\mu q$ (Tevatron)", lw=2, c='purple')
-ax.plot(tools.masses,  g4sq_limEFT  * p.mWeak**4, label="Xenon100 N=5 EFT $(c_4^p=c_4^n)$", c='r', lw=2)
-ax.plot(tools.masses,  g4nsq_limEFT * p.mWeak**4, label="Xenon100 N=5 EFT $(c_4^n)$", c='orange', lw=2)
-ax.plot(mX225_SDn, g4nsq_X225 * p.mWeak**4, label="Xenon100 225 live days (n)", c='k', lw=2)
+ax.plot(tools.masses,  g4sq_limEFT  * p.mWeak**4, label="XENON100 est. 90% CL $(c_4^p=c_4^n)$", c='r', lw=2)
+ax.plot(tools.masses,  g4nsq_limEFT * p.mWeak**4, label="XENON100 est. 90% CL $(c_4^n)$", c='orange', lw=2)
+ax.plot(mX225_SDn, g4nsq_X225 * p.mWeak**4, label="XENON100 225 live days (n)", c='k', lw=2)
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlabel("$m_\chi$")
@@ -331,8 +341,8 @@ plt.tight_layout()
 fig2 = plt.figure(figsize=(6,4))
 ax = fig2.add_subplot(111)
 ax.plot(M6_mchi, g4nsq_M6q    * p.mWeak**4, label="$\overline{\chi}\gamma_5\gamma_\mu\chi\overline{q}\gamma_5\gamma^\mu q$ (Tevatron)", lw=2, c='purple')
-ax.plot(tools.masses,  g4sq_limEFT  * p.mWeak**4, label="Xenon100 N=5 EFT $(c_4^p=c_4^n)$", c='r', lw=2)
-ax.plot(tools.masses,  g4nsq_limEFT * p.mWeak**4, label="Xenon100 N=5 EFT $(c_4^n)$", c='orange', lw=2)
+ax.plot(tools.masses,  g4sq_limEFT  * p.mWeak**4, label="XENON100 est. 90% CL $(c_4^p=c_4^n)$", c='r', lw=2)
+ax.plot(tools.masses,  g4nsq_limEFT * p.mWeak**4, label="XENON100 est. 90% CL $(c_4^n)$", c='orange', lw=2)
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlabel("$m_\chi$")
@@ -340,7 +350,9 @@ ax.set_ylabel(r"$c_4^2 \times\, m^4_\mathrm{weak}$")
 ax.set_ylim(np.array(ax.get_ylim())/10.)
 plt.legend(frameon=False)
 plt.tight_layout()
-fig2.savefig("note_M6_lims.png")
+fname = "note_M6_lims.png"
+fig2.savefig(fname)
+output_list += fname+"\n"
 #-------
 
 
@@ -349,9 +361,9 @@ fig2.savefig("note_M6_lims.png")
 
 #--- Now try something new
 
-# SD Xenon100 estimated limits via EFT:
-c10_lim_Xenon100 = tools.get_c_curve("c10p=c10n") # SD operator, equal proton/neutron couplings
-c10n_lim_Xenon100 = tools.get_c_curve("c10n")    # SD operator, coupling only to neutron
+# SD XENON100 estimated limits via EFT:
+c10_lim_XENON100 = tools.get_c_curve("c10p=c10n") # SD operator, equal proton/neutron couplings
+c10n_lim_XENON100 = tools.get_c_curve("c10n")    # SD operator, coupling only to neutron
 
 # Convert to/from sigma_O10 (in cm^-2)
 
@@ -362,8 +374,8 @@ g10nsq_M3q   = g10n_M3q**2
 g10psq_M9G   = g10p_M9G**2
 g10nsq_M9G   = g10n_M9G**2
 
-g10sq_limEFT = np.array(c10_lim_Xenon100)**2  * p.mWeak**-4
-g10nsq_limEFT= np.array(c10n_lim_Xenon100)**2 * p.mWeak**-4
+g10sq_limEFT = np.array(c10_lim_XENON100)**2  * p.mWeak**-4
+g10nsq_limEFT= np.array(c10n_lim_XENON100)**2 * p.mWeak**-4
 
 # cross sections
 # don't know how to do it yet
@@ -377,8 +389,8 @@ ylims = ax.get_ylim() # Get y limits from cross-section plot
 ax = fig.add_subplot(N,2,6)
 ax.plot(M3_mchi, g10nsq_M3q * p.mWeak**4, label="$\overline{\chi}\chi\overline{q}\gamma_5 q$ (Tevatron)", lw=2, c='b')
 ax.plot(M9_mchi, g10nsq_M9G * p.mWeak**4, label="$\overline{\chi}\chi G \widetilde{G}$ (Tevatron)", lw=2, c='c')
-ax.plot(tools.masses,  g10sq_limEFT  * p.mWeak**4, label="Xenon100 N=5 EFT $(c_{10}^p=c_{10}^n)$", c='r', lw=2)
-ax.plot(tools.masses,  g10nsq_limEFT * p.mWeak**4, label="Xenon100 N=5 EFT $(c_{10}^n)$", c='orange', lw=2)
+ax.plot(tools.masses,  g10sq_limEFT  * p.mWeak**4, label="XENON100 est. 90% CL $(c_{10}^p=c_{10}^n)$", c='r', lw=2)
+ax.plot(tools.masses,  g10nsq_limEFT * p.mWeak**4, label="XENON100 est. 90% CL $(c_{10}^n)$", c='orange', lw=2)
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlabel("$m_\chi$")
@@ -394,19 +406,22 @@ fig2 = plt.figure(figsize=(6,4))
 ax = fig2.add_subplot(111)
 ax.plot(M3_mchi, g10nsq_M3q * p.mWeak**4, label="$\overline{\chi}\chi\overline{q}\gamma_5 q$ (Tevatron)", lw=2, c='b')
 ax.plot(M9_mchi, g10nsq_M9G * p.mWeak**4, label="$\overline{\chi}\chi G \widetilde{G}$ (Tevatron)", lw=2, c='c')
-ax.plot(tools.masses,  g10sq_limEFT  * p.mWeak**4, label="Xenon100 N=5 EFT $(c_{10}^p=c_{10}^n)$", c='r', lw=2)
-ax.plot(tools.masses,  g10nsq_limEFT * p.mWeak**4, label="Xenon100 N=5 EFT $(c_{10}^n)$", c='orange', lw=2)
-#ax.plot(mX225,   g1sq_X225   * p.mWeak**4, label="Xenon100 225 live days", c='k', lw=2)
+ax.plot(tools.masses,  g10sq_limEFT  * p.mWeak**4, label="XENON100 est. 90% CL $(c_{10}^p=c_{10}^n)$", c='r', lw=2)
+ax.plot(tools.masses,  g10nsq_limEFT * p.mWeak**4, label="XENON100 est. 90% CL $(c_{10}^n)$", c='orange', lw=2)
+#ax.plot(mX225,   g1sq_X225   * p.mWeak**4, label="XENON100 225 live days", c='k', lw=2)
 ax.set_xscale("log")
 ax.set_yscale("log")
 ax.set_xlabel("$m_\chi$")
 ax.set_ylabel(r"$c_{10}^2 \times\, m^4_\mathrm{weak}$")
 plt.legend(frameon=False)
 plt.tight_layout()
-fig2.savefig("note_M3M9_lims.png")
+fname = "note_M3M9_lims.png"
+fig2.savefig(fname)
+output_list += fname+"\n"
 #-------
 
+fname="tevatron_lims.png"
+fig.savefig(fname)
+output_list += fname+"\n"
 
-
-fig.savefig("tevatron_lims.png")
-
+print output_list

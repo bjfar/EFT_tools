@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 #from scipy.interpolate import interp1d
 from scipy import interp
 
-import limit_comparison.translate_couplings as t
-import limit_comparison.comparison_tools as tools
-import limit_comparison.parameters as p
+import old.limit_comparison.translate_couplings as t
+import old.limit_comparison.comparison_tools as tools
+import old.limit_comparison.parameters as p
 
 rootpath = "/home/farmer/mathematica/DMFormFactor_13086288/"
 
@@ -49,11 +49,11 @@ g10G = g7G
 
 #================================
 # Goodman limit curves
-M1_mchi, M1_limit = np.loadtxt("goodman_limits/M1+3_tevatron.csv",delimiter=",").T
-M2_mchi, M2_limit = np.loadtxt("goodman_limits/M2+4_tevatron.csv",delimiter=",").T
-M5_mchi, M5_limit = np.loadtxt("goodman_limits/M5+6_tevatron.csv",delimiter=",").T
-M7_mchi, M7_limit = np.loadtxt("goodman_limits/M7+9_tevatron.csv",delimiter=",").T
-M8_mchi, M8_limit = np.loadtxt("goodman_limits/M8+10_tevatron.csv",delimiter=",").T
+M1_mchi, M1_limit = np.loadtxt("goodman_limits_data/M1+3_tevatron.csv",delimiter=",").T
+M2_mchi, M2_limit = np.loadtxt("goodman_limits_data/M2+4_tevatron.csv",delimiter=",").T
+M5_mchi, M5_limit = np.loadtxt("goodman_limits_data/M5+6_tevatron.csv",delimiter=",").T
+M7_mchi, M7_limit = np.loadtxt("goodman_limits_data/M7+9_tevatron.csv",delimiter=",").T
+M8_mchi, M8_limit = np.loadtxt("goodman_limits_data/M8+10_tevatron.csv",delimiter=",").T
 
 # Do some (constant) extrapolation on the low end, and interpolation in the middle.
 smooth_M1_mchi = np.logspace(0,np.log10(np.max(M1_mchi)),num=50)

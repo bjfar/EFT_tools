@@ -7,6 +7,7 @@
 (*2 - Relative output path*)
 (*3 - Xenon isotope (e.g. "131")*)
 (*4 - flag to use relativistic operator coefficients*)
+(*5 - flag to switch form factor treatment to traditional Helm form factors rather than derived from nuclear density matrices *) 
 
 (* Make output more readable in the terminal *)
 (* SetOptions["stdout", FormatType->InputForm] *)
@@ -39,6 +40,8 @@ isotope = ToExpression[args[[3]]];
 Otype = args[[4]]
 userel = SameQ[Otype,"R"]; (* Switch to using coefficients of relativistic operators (spin 1/2 WIMP only) *)
 checkrel = SameQ[args[[5]],"check"]; (* Compute coefficients of relativistic operators using their non-relativistic reductions (to check that I understand the mapping correctly *)
+helm = SameQ[args[[6]],"UseHelm"]; (* Use "traditional" Helm form factors rather than ones derived from nuclear density matrices *)
+
 
 (* Check that chosen Xenon isotope is valid *)
 validiso = {128,129,130,131,132,134,136};
@@ -52,7 +55,9 @@ SetAttributes[DoSilent, HoldAll];
 DoSilent[expr_] := Block[{Print = Null &}, expr];
 
 (* WIMP masses for which we want recoil spectra *)
-m\[Chi]={3,5,6,7,8,9,10,15,20,30,50,100,300,500,700,800,1000,2000,3000,5000}; (* GeV *)
+m\[Chi]={5,10,50}; (* GeV *)
+(*m\[Chi]={3,4,5,6,7,8,9,10,11,12,14,16,18,20,22,24,26,28,30,35,40,45,50,60,70,80,100,200,300,500,700,800,1000,2000}; (* GeV *)*)
+(*m\[Chi]={3,5,6,7,8,9,10,15,20,30,50,100,300,500,700,800,1000,2000,3000,5000}; (* GeV *) *)
 (*m\[Chi]={5,50,500,5000}; (* GeV *) *)
 spin=1/2 (*leave hardcoded for now*)
 
@@ -65,15 +70,18 @@ Internal`AddHandler["Message", messageHandler]
 
 Print["**************************************"    ]
 Print[" Generating recoil spectra for Xe"<>ToString[isotope]<>"..."]
-Print[" ...for spin "<>ToString[spin]<>" WIMP"    ]
+Print[" ...for spin "<>ToString[spin,InputForm]<>" WIMP"    ]
 Print[" ...for masses (GeV) "<>ToString[m\[Chi]]  ]
 Print[" ...for operator type "<>Otype             ]
+If[helm,
+Print[" ...with traditional Helm form factors"    ]]
 Print["**************************************"    ]
 
 (* Model Setup *)
 SetJChi[1/2](* WIMP spin *)
 SetMChi[MWIMP GeV] (* WIMP mass in GeV *)
 densmatrix="default";  (* nuclear density matrix (using default density matrices) *)
+SetHelm[helm]; (* If true use "traditional" Helm form factors rather than ones derived from nuclear density matrices *)
 bFM="default"; (* oscillation parameter (default: approximate formulae used) *)
 IsotopeA=isotope;
 Print["Setting A="<>ToString[IsotopeA]]
@@ -171,15 +179,21 @@ If[userel && !checkrel,
    ];
 ]
 
+If[helm,
+  Print["WARNING! Using traditional Helm form factors instead of the more advanced nuclear density matrix treatment!"];
+  Tag = Tag <> "_HelmFF";
+]
+
 (* Parameters *)
 mNucleon=0.938 GeV;
 NT=1/(IsotopeA* mNucleon);(*Number of target nuclei per detector mass*)
 Centimeter=(10^13 Femtometer);
 rhoDM=0.3GeV/Centimeter^3;(*Local dark matter density*)
-ve=232 KilometerPerSecond;(*Earth's velocity in galactic rest frame*)
+(*ve=232 KilometerPerSecond;(*Earth's velocity in galactic rest frame*)*)
+ve=220 KilometerPerSecond; (* from XEPHYR *)
 v0=220 KilometerPerSecond;(*Mean WIMP speed in galactic rest frame*)
-vesc=550 KilometerPerSecond;
-SetHalo["MBcutoff"];
+vesc=544 KilometerPerSecond;
+SetHALO["MBcutoff"];
 
 (* Event rate in symbolic form *)
 Print["Computing symbolic event rate..."];
@@ -198,8 +212,9 @@ ERmaxesc = Table[2(((\[Mu]T[[i]]^2) (v^2) )/mT)/GeV/.v->vesc,{i,1,Length[m\[Chi]
 
 
 (* General function to compute recoil spectra (couplings not yet replaced with values) *)
-ruleQtoE = {qGeV->Sqrt[2*mTv*ER], mTv->mT/GeV}
-generalfunc= benchmarkExposure*dRdE GeV /. ruleQtoE;
+ruleQtoE1 = qGeV->Sqrt[2*mTv*ER];
+ruleQtoE2 = mTv->mT/GeV;
+generalfunc= benchmarkExposure*dRdE GeV /. ruleQtoE1 /. ruleQtoE2;
 
 curvenames=Table["m\[Chi]="<>ToString[m\[Chi][[i]]],{i,1,Length[m\[Chi]]}];
 
@@ -274,7 +289,7 @@ If[userel && checkrel,
 funcsinter=Table[Table[ 
   WriteString["stdout", "  Evaluating WIMP mass= "<>ToString[m\[Chi][[m]]]<>", Operator="<>ToString[i]<>"          ",  "\r"];
   Table[
-    temp=(generalfunc//.rules[[i]][[p]]/.resttozero/.MWIMP->m\[Chi][[m]]/.ruleQtoE);
+    temp=(generalfunc//.rules[[i]][[p]]/.resttozero/.MWIMP->m\[Chi][[m]]);
     (* Simplify the result if all the GeV's haven't already cancelled out *)
     If[ FreeQ[temp, GeV],
       temp,
@@ -298,7 +313,7 @@ funcs=Table[Table[
 Print["  Complete!                                "];
 
 (* Specifiy recoil energies at which to evaluate the function *)
-Earr=Table[N[ER*10^-6],{ER,0 ,1000,1}];
+Earr=Table[N[ER*10^-6],{ER,1,1000,1}];
 
 (* Apply the analytic expressions to the chosen recoil energies and obtain final numerical tables *)
 Print["Computing numerical results at "<>ToString[Length[Earr]]<>" recoil energies between "<>ToString[FortranForm[First[Earr]]]<>" and "<>ToString[FortranForm[Last[Earr]]]<>" GeV"];
@@ -330,7 +345,7 @@ Do[
 (* Report on which operators vanish for this isotope *)
 Do[
   Do[
-    Print[{"Vanishes? ",0==dRdE GeV//.rules[[i]][[p]]/.resttozero/.MWIMP->500/.ruleQtoE/.ER->53.14*10^-6//Simplify}]
+    Print[{"Vanishes? ",0==dRdE GeV//.rules[[i]][[p]]/.resttozero/.MWIMP->500/.ruleQtoE1/.ruleQtoE2/.ER->53.14*10^-6//Simplify}]
   ,{p,1,3}]
 ,{i,1,Nops}]
 

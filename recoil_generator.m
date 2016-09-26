@@ -12,6 +12,13 @@
 (* Make output more readable in the terminal *)
 (* SetOptions["stdout", FormatType->InputForm] *)
 
+(* Turn on handler to abort evaluation if anything weird happens *)
+messageHandler = If[Last[#], Print["An error has occurred in 'recoil_generator.m'; aborting evaluation..."] Exit[1];]&
+Internal`AddHandler["Message", messageHandler]
+(* ..but need to suppress expected warnings *)
+Off[Part::partd]
+Off[Simplify::time]
+
 args = Join[$CommandLine[[4;;]],Table[{},{i,1,10}]];
 (* Print["Running with command line arguments: "<>ToString[args]]; *)
 outpath = Directory[]<>"/"<>args[[2]];
@@ -22,26 +29,34 @@ If[!DirectoryQ[outpath],
 ];
 
 path = args[[1]];
+isotope = ToExpression[args[[3]]];
+Otype = args[[4]]
+checkrel = SameQ[args[[5]],"check"]; (* Compute coefficients of relativistic operators using their non-relativistic reductions (to check that I understand the mapping correctly *)
+helm = SameQ[args[[6]],"UseHelm"]; (* Use "traditional" Helm form factors rather than ones derived from nuclear density matrices *)
+
+(* For Notebook testing, delete everything above this and uncomment the following: *)
+(*
+outpath = "recoil_spectrum_tables";
+path = "/home/farmer/mathematica/DMFormFactor_13086288";
+isotope = 131;
+Otype = "NR";
+checkrel = False; (* Compute coefficients of relativistic operators using their non-relativistic reductions (to check that I understand the mapping correctly *)
+helm = False; (* Use "traditional" Helm form factors rather than ones derived from nuclear density matrices *)
+*)
+
+userel = SameQ[Otype,"R"]; (* Switch to using coefficients of relativistic operators (spin 1/2 WIMP only) *)
 Print["Looking for DMFormFactor in directory: "<>path]
 If[!DirectoryQ[path],
   Print["\nSupplied DMFormFactor directory "<>path<>" does not exist! Please check it for typos and try again\n"];
   Exit[1];
 ];
-SetDirectory[path];
-(* SetDirectory["/home/farmer/mathematica/DMFormFactor_13086288"] (* for testing in notebook *)*)
 Check[
-  <<"v6/dmformfactor-V6.m";
+  Import[path<>"/v6/dmformfactor-V6.m"];
  ,
   Print["...Error loading DMFormFactor package. Please check the path (and perhaps version; this script requires v6) and try again"];
   Exit[1];
 ]
 Print["...Found."];
-isotope = ToExpression[args[[3]]];
-Otype = args[[4]]
-userel = SameQ[Otype,"R"]; (* Switch to using coefficients of relativistic operators (spin 1/2 WIMP only) *)
-checkrel = SameQ[args[[5]],"check"]; (* Compute coefficients of relativistic operators using their non-relativistic reductions (to check that I understand the mapping correctly *)
-helm = SameQ[args[[6]],"UseHelm"]; (* Use "traditional" Helm form factors rather than ones derived from nuclear density matrices *)
-
 
 (* Check that chosen Xenon isotope is valid *)
 validiso = {128,129,130,131,132,134,136};
@@ -55,18 +70,14 @@ SetAttributes[DoSilent, HoldAll];
 DoSilent[expr_] := Block[{Print = Null &}, expr];
 
 (* WIMP masses for which we want recoil spectra *)
-m\[Chi]={5,10,50}; (* GeV *)
-(*m\[Chi]={3,4,5,6,7,8,9,10,11,12,14,16,18,20,22,24,26,28,30,35,40,45,50,60,70,80,100,200,300,500,700,800,1000,2000}; (* GeV *)*)
+(*m\[Chi]={5,10,50}; (* GeV *)*)
+m\[Chi]={3,4,5,6,7,8,9,10,11,12,14,16,18,20,22,24,26,28,30,35,40,45,50,60,70,80,100,200,300,500,700,800,1000,2000}; (* GeV *)
 (*m\[Chi]={3,5,6,7,8,9,10,15,20,30,50,100,300,500,700,800,1000,2000,3000,5000}; (* GeV *) *)
 (*m\[Chi]={5,50,500,5000}; (* GeV *) *)
 spin=1/2 (*leave hardcoded for now*)
 
 (* Exposure to use for rate calculations. Can be easily scaled to something different in later analysis steps. *) 
 benchmarkExposure = 7800 KilogramDay;
-
-(* Turn on handler to abort evaluation if anything weird happens *)
-messageHandler = If[Last[#], Print["An error has occurred in 'recoil_generator.m'; aborting evaluation..."] Exit[1];]&
-Internal`AddHandler["Message", messageHandler]
 
 Print["**************************************"    ]
 Print[" Generating recoil spectra for Xe"<>ToString[isotope]<>"..."]
@@ -91,46 +102,10 @@ If[userel && !checkrel,
    (* Relativistic operator coefficients *)
    Print["Using RELATIVISTIC operator coefficients"];
    DoSilent[
-     SetCoeffsRel[1,c1p,"p"];
-     SetCoeffsRel[1,c1n,"n"];
-     SetCoeffsRel[2,c2p,"p"];
-     SetCoeffsRel[2,c2n,"n"];
-     SetCoeffsRel[3,c3p,"p"];
-     SetCoeffsRel[3,c3n,"n"];
-     SetCoeffsRel[4,c4p,"p"];
-     SetCoeffsRel[4,c4n,"n"];
-     SetCoeffsRel[5,c5p,"p"];
-     SetCoeffsRel[5,c5n,"n"];
-     SetCoeffsRel[6,c6p,"p"];
-     SetCoeffsRel[6,c6n,"n"];
-     SetCoeffsRel[7,c7p,"p"];
-     SetCoeffsRel[7,c7n,"n"];
-     SetCoeffsRel[8,c8p,"p"];
-     SetCoeffsRel[8,c8n,"n"];
-     SetCoeffsRel[9,c9p,"p"];
-     SetCoeffsRel[9,c9n,"n"];
-     SetCoeffsRel[10,c10p,"p"];
-     SetCoeffsRel[10,c10n,"n"];
-     SetCoeffsRel[11,c11p,"p"];
-     SetCoeffsRel[11,c11n,"n"];
-     SetCoeffsRel[12,c12p,"p"];
-     SetCoeffsRel[12,c12n,"n"];
-     SetCoeffsRel[13,c13p,"p"];
-     SetCoeffsRel[13,c13n,"n"];
-     SetCoeffsRel[14,c14p,"p"];
-     SetCoeffsRel[14,c14n,"n"];
-     SetCoeffsRel[15,c15p,"p"];
-     SetCoeffsRel[15,c15n,"n"];
-     SetCoeffsRel[16,c16p,"p"];
-     SetCoeffsRel[16,c16n,"n"];
-     SetCoeffsRel[17,c17p,"p"];
-     SetCoeffsRel[17,c17n,"n"];
-     SetCoeffsRel[18,c18p,"p"];
-     SetCoeffsRel[18,c18n,"n"];
-     SetCoeffsRel[19,c19p,"p"];
-     SetCoeffsRel[19,c19n,"n"];
-     SetCoeffsRel[20,c20p,"p"];
-     SetCoeffsRel[20,c20n,"n"];
+     Do[
+       SetCoeffsRel[i,cp[[i]],"p"];
+       SetCoeffsRel[i,cn[[i]],"n"];
+       ,{i,1,20}];
    ];
    Nops=20;
    Tag="R";
@@ -146,36 +121,10 @@ If[userel && !checkrel,
      Nops=15;
    ]
    DoSilent[
-     SetCoeffsNonrel[1,c1p,"p"];
-     SetCoeffsNonrel[1,c1n,"n"];
-     SetCoeffsNonrel[2,c2p,"p"];
-     SetCoeffsNonrel[2,c2n,"n"];
-     SetCoeffsNonrel[3,c3p,"p"];
-     SetCoeffsNonrel[3,c3n,"n"];
-     SetCoeffsNonrel[4,c4p,"p"];
-     SetCoeffsNonrel[4,c4n,"n"];
-     SetCoeffsNonrel[5,c5p,"p"];
-     SetCoeffsNonrel[5,c5n,"n"];
-     SetCoeffsNonrel[6,c6p,"p"];
-     SetCoeffsNonrel[6,c6n,"n"];
-     SetCoeffsNonrel[7,c7p,"p"];
-     SetCoeffsNonrel[7,c7n,"n"];
-     SetCoeffsNonrel[8,c8p,"p"];
-     SetCoeffsNonrel[8,c8n,"n"];
-     SetCoeffsNonrel[9,c9p,"p"];
-     SetCoeffsNonrel[9,c9n,"n"];
-     SetCoeffsNonrel[10,c10p,"p"];
-     SetCoeffsNonrel[10,c10n,"n"];
-     SetCoeffsNonrel[11,c11p,"p"];
-     SetCoeffsNonrel[11,c11n,"n"];
-     SetCoeffsNonrel[12,c12p,"p"];
-     SetCoeffsNonrel[12,c12n,"n"];
-     SetCoeffsNonrel[13,c13p,"p"];
-     SetCoeffsNonrel[13,c13n,"n"];
-     SetCoeffsNonrel[14,c14p,"p"];
-     SetCoeffsNonrel[14,c14n,"n"];
-     SetCoeffsNonrel[15,c15p,"p"];
-     SetCoeffsNonrel[15,c15n,"n"];
+     Do[
+       SetCoeffsRel[i,cp[[i]],"p"];
+       SetCoeffsRel[i,cn[[i]],"n"];
+       ,{i,1,15}];
    ];
 ]
 
@@ -219,12 +168,9 @@ generalfunc= benchmarkExposure*dRdE GeV /. ruleQtoE1 /. ruleQtoE2;
 curvenames=Table["m\[Chi]="<>ToString[m\[Chi][[i]]],{i,1,Length[m\[Chi]]}];
 
 (* Replacement rules for setting the couplings one by one *)
-coefflist={c1p,c1n,c2p,c2n,c3p,c3n,c4p,c4n,c5p,c5n,c6p,c6n,c7p,c7n,c8p,c8n,c9p,c9n,c10p,c10n,c11p,c11n,c12p,c12n,c13p,c13n,c14p,c14n,c15p,c15n,c16p,c16n,c17p,c17n,c18p,c18n,c19p,c19n,c20p,c20n};
-
-coefflistnoiso={c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17,c18,c19,c20};
-
-resttozero={c1p->0,c1n->0,c2p->0,c2n->0,c3p->0,c3n->0,c4p->0,c4n->0,c5p->0,c5n->0,c6p->0,c6n->0,c7p->0,c7n->0,c8p->0,c8n->0,c9p->0,c9n->0,c10p->0,c10n->0,c11p->0,c11n->0,c12p->0,c12n->0,c13p->0,c13n->0,c14p->0,c14n->0,c15p->0,c15n->0,c16p->0,c16n->0,c17p->0,c17n->0,c18p->0,c18n->0,c19p->0,c19n->0,c20p->0,c20n->0,
-c1->0,c2->0,c3->0,c4->0,c5->0,c6->0,c7->0,c8->0,c9->0,c10->0,c11->0,c12->0,c13->0,c14->0,c15->0,c16->0,c17->0,c18->0,c19->0,c20->0};
+coefflist=Table[{cp[[i]],cn[[i]]},{i,1,20}]//Flatten;
+coefflistnoiso=Table[c[[i]],{i,1,20}];
+resttozero=Table[{cp[[i]]->0,cn[[i]]->0,c[[i]]->0},{i,1,20}]//Flatten;
 
 (* Replacement rules for recreating relativistic operators by setting their non-relativistic reductions correctly (see table 1 of documentation-standalone.pdf) *)
 (* Result should be equivalent to setting the various d's to 1 *)
@@ -236,46 +182,49 @@ mX = MWIMP GeV;
 mN = mNucleon;
 reductionrules=
 {
-  (*1*) {c1->1},
-  (*2*) {c10->1},
-  (*3*) {c11->-mN/mX},
-  (*4*) {c6-> -mN/mX},
-  (*5*) {c1->1},
-  (*6*) {c1-> qGeV^2/(2*mN*mM), 
-         c3->-2*mN/mM, 
-         c4-> 2*mN^2/(mM*mX) * qGeV^2/mN^2,  
-         c6->-2*mN^2/(mM*mX)},
-  (*7*) {c7->-2,
-         c9->2*mN/mX},
-  (*8*) {c10->2*mN/mM},
-  (*9*) {c1->-qGeV^2/(2*mX*mM),
-         c5->2*mN/mM,
-         c4->-2*mN/mM * qGeV^2/mN^2,
-         c6-> 2*mN/mM},
-  (*10*) {c4->4*qGeV^2/mM^2,
-          c6->-mN^2/mM^2},
-  (*11*) {c9->4*mN/mM},
-  (*12*) {c10->-mN/mX * qGeV^2/mM^2,
-          c12->-4*qGeV^2/mM^2,
-          c15->-4*mN^2/mM^2},
-  (*13*) {c8->2,
-          c9->2},
-  (*14*) {c9->-4*mN/mM},
-  (*15*) {c4->-4},
-  (*16*) {c13->4*mN/mM},
-  (*17*) {c11->2*mN/mM},
-  (*18*) {c11->qGeV^2/mM^2,
-          c15->4*mN^2/mM^2},
-  (*19*) {c14->-4*mN/mM},
-  (*20*) {c6->4*mN^2/mM^2}
+  (*1*) {c[1]->1},
+  (*2*) {c[10]->1},
+  (*3*) {c[11]->-mN/mX},
+  (*4*) {c[6]-> -mN/mX},
+  (*5*) {c[1]->1},
+  (*6*) {c[1]-> qGeV^2/(2*mN*mM), 
+         c[3]->-2*mN/mM, 
+         c[4]-> 2*mN^2/(mM*mX) * qGeV^2/mN^2,  
+         c[6]->-2*mN^2/(mM*mX)},
+  (*7*) {c[7]->-2,
+         c[9]->2*mN/mX},
+  (*8*) {c[10]->2*mN/mM},
+  (*9*) {c[1]->-qGeV^2/(2*mX*mM),
+         c[5]->2*mN/mM,
+         c[4]->-2*mN/mM * qGeV^2/mN^2,
+         c[6]-> 2*mN/mM},
+  (*10*) {c[4]->4*qGeV^2/mM^2,
+          c[6]->-mN^2/mM^2},
+  (*11*) {c[9]->4*mN/mM},
+  (*12*) {c[10]->-mN/mX * qGeV^2/mM^2,
+          c[12]->-4*qGeV^2/mM^2,
+          c[15]->-4*mN^2/mM^2},
+  (*13*) {c[8]->2,
+          c[9]->2},
+  (*14*) {c[9]->-4*mN/mM},
+  (*15*) {c[4]->-4},
+  (*16*) {c[13]->4*mN/mM},
+  (*17*) {c[11]->2*mN/mM},
+  (*18*) {c[11]->qGeV^2/mM^2,
+          c[15]->4*mN^2/mM^2},
+  (*19*) {c[14]->-4*mN/mM},
+  (*20*) {c[6]->4*mN^2/mM^2}
 };
 
+(*Get rid of unsimplified GeV units*)
+noGeVfunc = generalfunc // Simplify[#, { MWIMP \[Element] Reals, MWIMP > 0}, TimeConstraint -> 0.1] &;
 
+(*
 (* Full list of all the rules we want *)
 If[userel && checkrel,
   Print["Applying coefficient replacement rules (using manual non-relativistic reductions)..."];
-  ponly=Table[coefflist[[2*i-1]]->coefflistnoiso[[i]],{i,1,15}];
-  nonly=Table[coefflist[[2*i]]->coefflistnoiso[[i]],{i,1,15}];
+  ponly=Table[cp[[i]]->c[[i]],{i,1,15}];
+  nonly=Table[cn[[2*i]]->coefflistnoiso[[i]],{i,1,15}];
   nandp=Join[ponly,nonly];
   (* rules are: first, remove p and/or n from names of non-zero coefficients (rest go to zero). Second, apply one of the non-relativistic reduction rules *)
   rules=Table[ { Join[ponly,reductionrules[[i]]],
@@ -311,43 +260,96 @@ funcs=Table[Table[
   ,{p,1,3}]
 ,{m,1,Length[m\[Chi]]}],{i,1,Nops}];
 Print["  Complete!                                "];
+*)
+
+(* plot titles *)
+titles=Table[{"c"<>ToString[i]<>"p","c"<>ToString[i]<>"n","c"<>ToString[i]<>"p=c"<>ToString[i]<>"n"},{i,1,Nops}];
 
 (* Specifiy recoil energies at which to evaluate the function *)
-Earr=Table[N[ER*10^-6],{ER,1,1000,1}];
+(* Two versions: one for low PE signal region, one for high PE
+   Goes well beyond signal region boundaries to account for future smearing *)
+Earrlow =Table[N[ER*10^-6],{ER,0.025,50,0.025}];
+Earrhigh=Table[N[ER*10^-6],{ER,0.5,1000,0.5}];
+
+(* Create tables of coupling values to use *)
+zeros    = Table[0,{i,1,Nops}];
+zerosAll = Table[zeros,{i,1,Nops}];
+cpsAll   = Table[tmp = zeros; tmp[[i]] = 1; tmp, {i, 1, Nops}];
+cnsAll   = Table[tmp = zeros; tmp[[i]] = 1; tmp, {i, 1, Nops}];
+
+(* Three sets of coupling combinations *)
+cCombs = {{cpsAll,zerosAll},{zerosAll,cnsAll},{cpsAll,cnsAll}}
 
 (* Apply the analytic expressions to the chosen recoil energies and obtain final numerical tables *)
-Print["Computing numerical results at "<>ToString[Length[Earr]]<>" recoil energies between "<>ToString[FortranForm[First[Earr]]]<>" and "<>ToString[FortranForm[Last[Earr]]]<>" GeV"];
-plotdata=
- Table[
-   WriteString["stdout", "  Evaluating operator="<>ToString[i]<>"          ", "\r"];
+getnum[EarrIN_] := Module[{Earr=EarrIN,out,i,m,p},
+  Print["Computing numerical results at "<>ToString[Length[Earr]]<>" recoil energies between "<>ToString[FortranForm[First[Earr]]]<>" and "<>ToString[FortranForm[Last[Earr]]]<>" GeV"];
+  out=
    Table[
-      Transpose[Join[{Earr*10^6},
-                  Table[
-                        10^-6*funcs[[i]][[m]][[p]]/@Earr
-                       ,{m,1,Length[m\[Chi]]}
-                       ]
-                    ]
-               ]
-   ,{p,1,3}]
- ,{i,1,Nops}];
-Print["  Complete!                                "];
+     WriteString["stdout", "  Evaluating operator="<>ToString[i]<>"          ", "\r"];
+     Table[
+        tmpf = noGeVfunc /. {cp -> cs[[1]][[i]], cn -> cs[[2]][[i]]};
+        tmp = If[PossibleZeroQ[tmpf], (*happens for some operators for some isotopes*)
+          Table[0.*Earr, {m, m\[Chi]}] (* set dRdE to zero *)
+          ,
+          Table[10^-6 * tmpf /. {MWIMP -> m, ER -> Earr}, {m, m\[Chi]}]
+        ];
+        Transpose[Join[{SetPrecision[Earr*10^6,8]},tmp]]
+     ,{cs,cCombs}]
+   ,{i,1,Nops}];
+  Print["  Complete!                                "];
+  out (* "return" value *)
+]
+
+(* Function to convert numbers to Fortran-like format
+from: http://mathematica.stackexchange.com/a/19547/32644 *)
+f77Eform[x_?NumericQ, fw_Integer, ndig_Integer] := Module[{sig, s, p, ps},
+        {s, p} = MantissaExponent[x];
+     {sig, ps} = {ToString[Round[10^ndig Abs[s]]], ToString[Abs[p]]};
+      StringJoin @@ Join[
+                   Table[" ", {fw - ndig - 7}],
+                   If[x < 0, "-", " "], {"0."}, {sig},
+                   Table["0", {ndig - StringLength[sig]}], {"E"}, 
+                   If[p < 0, {"-"}, {"+"}],
+                   Table["0", {2 - StringLength[ps]}], {ps}]]
+
+
+(* Faster write to disk than Export
+from: http://mathematica.stackexchange.com/a/35375/32644 *)
+writeYourCSV[file_String, list_List?MatrixQ] := 
+ With[{str = OpenWrite[file, PageWidth -> Infinity], 
+   len = Length[list[[1]]]}, 
+  Scan[Write[str, 
+     Sequence @@ (Flatten[
+         Table[{FortranForm[#[[i]]], OutputForm["\t"]}, {i, 
+           len - 1}]])~Join~{FortranForm[#[[len]]]}] &, list]; 
+  Close[str];]
 
 (* Save data tables to file *)
-extendedoutpath=outpath<>"/Xe"<>ToString[IsotopeA]
-If[!DirectoryQ[extendedoutpath], CreateDirectory[extendedoutpath]]
-Do[
+savedata[dataIN_,SRtagIN_] := Module[{data=dataIN,SRtag=SRtagIN,i,p},
+  extendedoutpath=outpath<>"/Xe"<>ToString[IsotopeA];
+  If[!DirectoryQ[extendedoutpath], CreateDirectory[extendedoutpath]]
   Do[
-    filename="Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>titles[[i]][[p]]<>".dat";
-    Export[extendedoutpath<>"/"<>filename, plotdata[[i]][[p]], "Table"]
-  ,{i,1,Nops}]
-,{p,1,3}];
+    Do[
+      filename=extendedoutpath<>"/Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>SRtag<>"_"<>titles[[i]][[p]]<>".dat";
+      Print["  Writing file: "<>filename];
+      (*Export[filename, SetPrecision[data[[i]][[p]],8], "Table"];*)
+      writeYourCSV[filename,data[[i]][[p]]];
+    ,{i,1,Nops}]
+  ,{p,1,3}];
+]
+plotdatalow  = getnum[Earrlow];
+savedata[plotdatalow,"lowE"];
+plotdatahigh = getnum[Earrhigh];
+savedata[plotdatahigh,"highE"];
 
+(* Fix this up later
 (* Report on which operators vanish for this isotope *)
 Do[
   Do[
     Print[{"Vanishes? ",0==dRdE GeV//.rules[[i]][[p]]/.resttozero/.MWIMP->500/.ruleQtoE1/.ruleQtoE2/.ER->53.14*10^-6//Simplify}]
   ,{p,1,3}]
 ,{i,1,Nops}]
+*)
 
 (* Exit with success exit code *)
 Exit[0];

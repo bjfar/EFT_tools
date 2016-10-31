@@ -8,8 +8,8 @@ DMFFdir="/home/farmer/mathematica/DMFormFactor_13086288"
 # Output path (where spectrum tables will be written)
 outdir="recoil_spectrum_tables"
 
-#for isotope in 128 129 130 131 132 134 136; do
-for isotope in 129; do
+for isotope in 128 129 130 131 132 134 136; do
+#for isotope in 129; do
 #for isotope in 131; do
     #echo "**************************************"
     #echo " Generating recoil spectra for Xe"$isotope"..."

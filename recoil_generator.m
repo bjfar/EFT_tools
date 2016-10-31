@@ -122,8 +122,8 @@ If[userel && !checkrel,
    ]
    DoSilent[
      Do[
-       SetCoeffsRel[i,cp[[i]],"p"];
-       SetCoeffsRel[i,cn[[i]],"n"];
+       SetCoeffsNonrel[i,cp[[i]],"p"];
+       SetCoeffsNonrel[i,cn[[i]],"n"];
        ,{i,1,15}];
    ];
 ]

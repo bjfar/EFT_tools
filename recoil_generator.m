@@ -71,7 +71,11 @@ DoSilent[expr_] := Block[{Print = Null &}, expr];
 
 (* WIMP masses for which we want recoil spectra *)
 (*m\[Chi]={5,10,50}; (* GeV *)*)
-m\[Chi]={3,4,5,6,7,8,9,10,11,12,14,16,18,20,22,24,26,28,30,35,40,45,50,60,70,80,100,200,300,500,700,800,1000,2000}; (* GeV *)
+
+(* This one used a lot up until R vs NR bug found, now switching to limited list below*)
+(*m\[Chi]={3,4,5,6,7,8,9,10,11,12,14,16,18,20,22,24,26,28,30,35,40,45,50,60,70,80,100,200,300,500,700,800,1000,2000}; (* GeV *)*)
+m\[Chi]={5,8,10,16,20,30,40,50,70,100,300,500,800,1000};
+
 (*m\[Chi]={3,5,6,7,8,9,10,15,20,30,50,100,300,500,700,800,1000,2000,3000,5000}; (* GeV *) *)
 (*m\[Chi]={5,50,500,5000}; (* GeV *) *)
 spin=1/2 (*leave hardcoded for now*)
@@ -219,56 +223,13 @@ reductionrules=
 (*Get rid of unsimplified GeV units*)
 noGeVfunc = generalfunc // Simplify[#, { MWIMP \[Element] Reals, MWIMP > 0}, TimeConstraint -> 0.1] &;
 
-(*
-(* Full list of all the rules we want *)
-If[userel && checkrel,
-  Print["Applying coefficient replacement rules (using manual non-relativistic reductions)..."];
-  ponly=Table[cp[[i]]->c[[i]],{i,1,15}];
-  nonly=Table[cn[[2*i]]->coefflistnoiso[[i]],{i,1,15}];
-  nandp=Join[ponly,nonly];
-  (* rules are: first, remove p and/or n from names of non-zero coefficients (rest go to zero). Second, apply one of the non-relativistic reduction rules *)
-  rules=Table[ { Join[ponly,reductionrules[[i]]],
-                 Join[nonly,reductionrules[[i]]],
-                 Join[nandp,reductionrules[[i]]] } ,{i,1,Nops}];
-  , (* else do normal thing *)
-  Print["Applying coefficient replacement rules..."];
-  rules=Table[{{coefflist[[2*i-1]]->1},{coefflist[[2*i]]->1},{coefflist[[2*i-1]]->1,coefflist[[2*i]]->1}},{i,1,Nops}];
-]
-
-funcsinter=Table[Table[ 
-  WriteString["stdout", "  Evaluating WIMP mass= "<>ToString[m\[Chi][[m]]]<>", Operator="<>ToString[i]<>"          ",  "\r"];
-  Table[
-    temp=(generalfunc//.rules[[i]][[p]]/.resttozero/.MWIMP->m\[Chi][[m]]);
-    (* Simplify the result if all the GeV's haven't already cancelled out *)
-    If[ FreeQ[temp, GeV],
-      temp,
-      Simplify[temp]
-    ]
-  ,{p,1,3}]
-,{m,1,Length[m\[Chi]]}],{i,1,Nops}];
-Print["  Complete!                                "];
-
-(* plot titles *)
-titles=Table[{ToString[coefflist[[2*i-1]]],ToString[coefflist[[2*i]]],ToString[coefflist[[2*i-1]]]<>"="<>ToString[coefflist[[2*i]]]},{i,1,Nops}];
-
-(* Convert expressions to functions so that recoil energies can be supplied as arguments*)
-Print["Converting expressions to functions..."]
-funcs=Table[Table[
-  WriteString["stdout", "  Evaluating WIMP mass= "<>ToString[m\[Chi][[m]]]<>", Operator="<>ToString[i]<>"          ", "\r"];
-  Table[
-    With[{i=i,p=p,m=m},(funcsinter[[i]][[m]][[p]]/.ER->#)&]
-  ,{p,1,3}]
-,{m,1,Length[m\[Chi]]}],{i,1,Nops}];
-Print["  Complete!                                "];
-*)
-
 (* plot titles *)
 titles=Table[{"c"<>ToString[i]<>"p","c"<>ToString[i]<>"n","c"<>ToString[i]<>"p=c"<>ToString[i]<>"n"},{i,1,Nops}];
 
 (* Specifiy recoil energies at which to evaluate the function *)
 (* Two versions: one for low PE signal region, one for high PE
-   Goes well beyond signal region boundaries to account for future smearing *)
-Earrlow =Table[N[ER*10^-6],{ER,0.025,50,0.025}];
+   Goes well beyond signal region boundaries to account for detector response (smearing) *)
+Earrlow =Table[N[ER*10^-6],{ER,0.025,100,0.025}];
 Earrhigh=Table[N[ER*10^-6],{ER,0.5,1000,0.5}];
 
 (* Create tables of coupling values to use *)

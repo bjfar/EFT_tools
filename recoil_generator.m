@@ -3,11 +3,13 @@
 (* Compute recoil spectra for a specified isotope of Xenon *)
 
 (*Args:*)
-(*1 - Absolute path to "v6/dmformfactor-V6.m"*)
+(*1 - Absolute path to "v6/dmformfactor-V6.m"
+      or to "v4/dmformfactor-V4-IDM.m" for inelastic mode (package from Chang et. al. 1409.0536) *)
 (*2 - Relative output path*)
 (*3 - Xenon isotope (e.g. "131")*)
 (*4 - flag to use relativistic operator coefficients*)
 (*5 - flag to switch form factor treatment to traditional Helm form factors rather than derived from nuclear density matrices *) 
+(*6 - flag to switch to inelastic scattering mode *)
 
 (* Make output more readable in the terminal *)
 (* SetOptions["stdout", FormatType->InputForm] *)
@@ -33,6 +35,7 @@ isotope = ToExpression[args[[3]]];
 Otype = args[[4]]
 checkrel = SameQ[args[[5]],"check"]; (* Compute coefficients of relativistic operators using their non-relativistic reductions (to check that I understand the mapping correctly *)
 helm = SameQ[args[[6]],"UseHelm"]; (* Use "traditional" Helm form factors rather than ones derived from nuclear density matrices *)
+idm = SameQ[args[[7]],"IDM"]; (* Alter scattering kinematics to inelastic; code from 1409.0536; note, must also alter package path*)
 
 (* For Notebook testing, delete everything above this and uncomment the following: *)
 (*
@@ -51,9 +54,17 @@ If[!DirectoryQ[path],
   Exit[1];
 ];
 Check[
-  Import[path<>"/v6/dmformfactor-V6.m"];
+  If[idm,
+    Import[path<>"/v4/dmformfactor-V4-IDM.m"];
+    ,
+    Import[path<>"/v6/dmformfactor-V6.m"]; 
+  ]
  ,
-  Print["...Error loading DMFormFactor package. Please check the path (and perhaps version; this script requires v6) and try again"];
+  If[idm,
+    Print["...Error loading DMFormFactor package. Please check the path (and perhaps version; you have selected INELASTIC mode so this script requires the modified v4 from 1409.0536) and try again"];
+    ,
+    Print["...Error loading DMFormFactor package. Please check the path (and perhaps version; this script requires v6) and try again"];
+  ]
   Exit[1];
 ]
 Print["...Found."];
@@ -74,11 +85,20 @@ DoSilent[expr_] := Block[{Print = Null &}, expr];
 
 (* This one used a lot up until R vs NR bug found, now switching to limited list below*)
 (*m\[Chi]={3,4,5,6,7,8,9,10,11,12,14,16,18,20,22,24,26,28,30,35,40,45,50,60,70,80,100,200,300,500,700,800,1000,2000}; (* GeV *)*)
-m\[Chi]={5,8,10,16,20,30,40,50,70,100,300,500,800,1000};
+m\[Chi]={5,6,7,8,9,10,16,20,30,40,50,70,100,300,500,800,1000,3000,5000,8000,10000};
 
 (*m\[Chi]={3,5,6,7,8,9,10,15,20,30,50,100,300,500,700,800,1000,2000,3000,5000}; (* GeV *) *)
 (*m\[Chi]={5,50,500,5000}; (* GeV *) *)
 spin=1/2 (*leave hardcoded for now*)
+
+(* Specifiy recoil energies at which to evaluate dR/dE, in keV *)
+(* Two versions: one for low PE signal region, one for high PE
+   Goes well beyond signal region boundaries to account for detector response (smearing) *)
+Earrlow =Table[N[ER*10^-6],{ER,0.05,100,0.05}];
+Earrhigh=Table[N[ER*10^-6],{ER,0.5,1000,0.5}];
+
+(* For INELASTIC scattering; select delm (mass splitting) values to use (in keV)*)
+delmlist={0,5,10,30,70,100,150,200,250,300,400,500,700,1000};
 
 (* Exposure to use for rate calculations. Can be easily scaled to something different in later analysis steps. *) 
 benchmarkExposure = 7800 KilogramDay;
@@ -89,7 +109,11 @@ Print[" ...for spin "<>ToString[spin,InputForm]<>" WIMP"    ]
 Print[" ...for masses (GeV) "<>ToString[m\[Chi]]  ]
 Print[" ...for operator type "<>Otype             ]
 If[helm,
-Print[" ...with traditional Helm form factors"    ]]
+  Print[" ...with traditional Helm form factors"    ]]
+If[idm,
+  Print[" ...using INELASTIC WIMP scattering kinematics"]
+  Print[" ...for mass splittings (keV) "<>ToString[delmlist]  ]
+]
 Print["**************************************"    ]
 
 (* Model Setup *)
@@ -149,9 +173,17 @@ vesc=544 KilometerPerSecond;
 SetHALO["MBcutoff"];
 
 (* Event rate in symbolic form *)
-Print["Computing symbolic event rate..."];
+If[idm,
+   Print["Computing symbolic event rate for INELASTIC scattering..."];
+   ,
+   Print["Computing symbolic event rate for elastic scattering..."];
+]
 DoSilent[
-  dRdE=EventRate[NT,rhoDM,qGeV,ve,v0,vesc]; (* as function of q, not ER *)
+  If[idm,
+      dRdE=EventRateInelastic[NT,rhoDM,delm 10^-6 GeV,qGeV,ve,v0,vesc];
+      ,
+      dRdE=EventRate[NT,rhoDM,qGeV,ve,v0,vesc]; (* as function of q, not ER *)
+    ]
 ];
 
 
@@ -167,9 +199,13 @@ ERmaxesc = Table[2(((\[Mu]T[[i]]^2) (v^2) )/mT)/GeV/.v->vesc,{i,1,Length[m\[Chi]
 (* General function to compute recoil spectra (couplings not yet replaced with values) *)
 ruleQtoE1 = qGeV->Sqrt[2*mTv*ER];
 ruleQtoE2 = mTv->mT/GeV;
+Print["Transforming general analytic recoil spectra function..."]
 generalfunc= benchmarkExposure*dRdE GeV /. ruleQtoE1 /. ruleQtoE2;
 
 curvenames=Table["m\[Chi]="<>ToString[m\[Chi][[i]]],{i,1,Length[m\[Chi]]}];
+If[idm,
+  idmnames=Table["delm="<>ToString[delmlist[[i]]],{i,1,Length[delmlist]}];
+]
 
 (* Replacement rules for setting the couplings one by one *)
 coefflist=Table[{cp[[i]],cn[[i]]},{i,1,20}]//Flatten;
@@ -221,17 +257,10 @@ reductionrules=
 };
 
 (*Get rid of unsimplified GeV units*)
-noGeVfunc = generalfunc // Simplify[#, { MWIMP \[Element] Reals, MWIMP > 0}, TimeConstraint -> 0.1] &;
+Print["Simplifying out GeV units..."]
+noGeVfunc = generalfunc // Simplify[#, { MWIMP \[Element] Reals, MWIMP > 0, delm \[Element] Reals, delm >= 0, GeV \[Element] Reals, GeV>0}, TimeConstraint -> 0.01] &;
 
-(* plot titles *)
-titles=Table[{"c"<>ToString[i]<>"p","c"<>ToString[i]<>"n","c"<>ToString[i]<>"p=c"<>ToString[i]<>"n"},{i,1,Nops}];
-
-(* Specifiy recoil energies at which to evaluate the function *)
-(* Two versions: one for low PE signal region, one for high PE
-   Goes well beyond signal region boundaries to account for detector response (smearing) *)
-Earrlow =Table[N[ER*10^-6],{ER,0.025,100,0.025}];
-Earrhigh=Table[N[ER*10^-6],{ER,0.5,1000,0.5}];
-
+Print["Creating generator tables for numerical results..."]
 (* Create tables of coupling values to use *)
 zeros    = Table[0,{i,1,Nops}];
 zerosAll = Table[zeros,{i,1,Nops}];
@@ -239,22 +268,52 @@ cpsAll   = Table[tmp = zeros; tmp[[i]] = 1; tmp, {i, 1, Nops}];
 cnsAll   = Table[tmp = zeros; tmp[[i]] = 1; tmp, {i, 1, Nops}];
 
 (* Three sets of coupling combinations *)
-cCombs = {{cpsAll,zerosAll},{zerosAll,cnsAll},{cpsAll,cnsAll}}
+(*
+cCombs = {{cpsAll,zerosAll},{zerosAll,cnsAll},{cpsAll,cnsAll}};
+Temporarily turning off all but isoscalar case*)
+cCombs = {{cpsAll,cnsAll}};
+NcCombs = 1;
+
+(* plot titles *)
+(*titles=Table[{"c"<>ToString[i]<>"p","c"<>ToString[i]<>"n","c"<>ToString[i]<>"p=c"<>ToString[i]<>"n"},{i,1,Nops}];*)
+titles=Table[{"c"<>ToString[i]<>"p=c"<>ToString[i]<>"n"},{i,1,Nops}]
 
 (* Apply the analytic expressions to the chosen recoil energies and obtain final numerical tables *)
-getnum[EarrIN_] := Module[{Earr=EarrIN,out,i,m,p},
+getnum[EarrIN_] := Module[{Earr=EarrIN,out,i,m,p,d,cs,tmp,tmp2,tmpf,tmpf2,tmpf3,tmpf4},
   Print["Computing numerical results at "<>ToString[Length[Earr]]<>" recoil energies between "<>ToString[FortranForm[First[Earr]]]<>" and "<>ToString[FortranForm[Last[Earr]]]<>" GeV"];
   out=
    Table[
-     WriteString["stdout", "  Evaluating operator="<>ToString[i]<>"          ", "\r"];
+     WriteString["stdout", "  Evaluating operator="<>ToString[i]<>"                                ", "\n"];
      Table[
+        WriteString["stdout", " Applying coefficient replacements...                     ", "\r"];
         tmpf = noGeVfunc /. {cp -> cs[[1]][[i]], cn -> cs[[2]][[i]]};
-        tmp = If[PossibleZeroQ[tmpf], (*happens for some operators for some isotopes*)
-          Table[0.*Earr, {m, m\[Chi]}] (* set dRdE to zero *)
+        WriteString["stdout", " Checking for equality with zero...                      ", "\r"];
+        tmp = If[AllTrue[tmpf/.{delm -> 1, MWIMP -> 50, ER -> Earr},PossibleZeroQ], (*happens for some operators for some isotopes*)
+          tmp2 = Table[0.*Earr, {m, m\[Chi]}]; (* set dRdE to zero *)
+          If[idm,
+             Table[Transpose[Join[{SetPrecision[Earr*10^6,8]},tmp2]],{d,delmlist}]
+             ,
+             Transpose[Join[{SetPrecision[Earr*10^6,8]},tmp2]]
+          ]
           ,
-          Table[10^-6 * tmpf /. {MWIMP -> m, ER -> Earr}, {m, m\[Chi]}]
-        ];
-        Transpose[Join[{SetPrecision[Earr*10^6,8]},tmp]]
+          If[idm,
+            Table[
+              WriteString["stdout", " Applying delm = "<>ToString[d]<>" replacement...                 ", "\r"];
+              tmpf2 = 10^-6 * tmpf /. {delm -> d};
+              tmp2 = Table[
+                WriteString["stdout", " Applying WIMP mass = "<>ToString[m]<>" replacement...                     ", "\r"];
+                tmpf3 = tmpf2 /. {MWIMP -> m};
+                WriteString["stdout", " Applying ER replacements...                      ", "\r"];
+                tmpf4 = tmpf3 /. {ER -> Earr}
+                , {m, m\[Chi]}];
+              WriteString["stdout", " Joining with ER values...                  ", "\r"];
+              Transpose[Join[{SetPrecision[Earr*10^6,8]},tmp2]]
+            ,{d, delmlist}]
+            ,
+            tmp2 = Table[10^-6 * tmpf /. {MWIMP -> m, ER -> Earr}, {m, m\[Chi]}];
+            Transpose[Join[{SetPrecision[Earr*10^6,8]},tmp2]]
+          ]
+        ]
      ,{cs,cCombs}]
    ,{i,1,Nops}];
   Print["  Complete!                                "];
@@ -291,12 +350,28 @@ savedata[dataIN_,SRtagIN_] := Module[{data=dataIN,SRtag=SRtagIN,i,p},
   If[!DirectoryQ[extendedoutpath], CreateDirectory[extendedoutpath]]
   Do[
     Do[
-      filename=extendedoutpath<>"/Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>SRtag<>"_"<>titles[[i]][[p]]<>".dat";
-      Print["  Writing file: "<>filename];
-      (*Export[filename, SetPrecision[data[[i]][[p]],8], "Table"];*)
-      writeYourCSV[filename,data[[i]][[p]]];
+      If[idm,
+        (* old way
+        Do[
+           filename=extendedoutpath<>"/IDM_Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>SRtag<>"_"<>titles[[i]][[p]]<>"_delm"<>ToString[delmlist[[d]]]<>".dat";
+           Print["  Writing file: "<>filename];
+           (*Export[filename, SetPrecision[data[[i]][[p]],8], "Table"];*)
+           writeYourCSV[filename,data[[i]][[p]][[d]]];
+        ,{d,1,Length[delmlist]}]
+        *)
+        (* Now using HDF5 format *)
+        filename=extendedoutpath<>"/IDM_Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>SRtag<>"_"<>titles[[i]][[p]]<>".h5";
+        Print["  Writing file: "<>filename];
+        Export[filename,data[[i]][[p]],{"Datasets", Table["delm"<>ToString[d],{d,delmlist}]}] 
+        ,
+        filename=extendedoutpath<>"/Xe"<>ToString[IsotopeA]<>"_"<>Tag<>"_"<>SRtag<>"_"<>titles[[i]][[p]]<>".h5";
+        Print["  Writing file: "<>filename];
+        (*Export[filename, SetPrecision[data[[i]][[p]],8], "Table"];*)
+        (*writeYourCSV[filename,data[[i]][[p]]];*)
+        Export[filename,data[[i]][[p]]] 
+       ]
     ,{i,1,Nops}]
-  ,{p,1,3}];
+  ,{p,1,NcCombs}];
 ]
 plotdatalow  = getnum[Earrlow];
 savedata[plotdatalow,"lowE"];

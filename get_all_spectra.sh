@@ -10,11 +10,12 @@ outdir="recoil_spectrum_tables"
 
 for isotope in 128 129 130 131 132 134 136; do
 #for isotope in 129; do
+#for isotope in 131 128 129 130 132 134 136; do
 #for isotope in 131; do
     #echo "**************************************"
     #echo " Generating recoil spectra for Xe"$isotope"..."
     #echo "**************************************"
-    ./recoil_generator.m $DMFFdir $outdir $isotope NR nocheck noHelm 
+    ./recoil_generator.m $DMFFdir $outdir $isotope NR nocheck noHelm IDM 
     echo $?
     if ! echo $?; then 
         echo "Error detected, aborting loop."
